@@ -5,6 +5,8 @@ const { Bot, GrammyError, HttpError } = require('grammy')
 const qrcode = require('qrcode')
 const { createCanvas, loadImage } = require('canvas')
 
+const puppeteer = require('puppeteer');
+
 const bot = new Bot(process.env.BOT_API_KEY) //подключаем API бота
 
 // !очень важен порядок обработчиков
@@ -26,6 +28,14 @@ bot.api.setMyCommands([
 		command: 'site',
 		description: 'Отправляет в чат ссылку на сайт октагона',
 	},
+	{
+		command: 'qr',
+		description: 'Отправляет QR-код на указанную ссылку',
+	},
+	{
+		command: 'webscr',
+		description: 'Отправляет в чат скриншот указанного сайта',
+	},
 ])
 
 // *название команды пишем без '/'
@@ -40,22 +50,22 @@ bot.command('qr', async ctx => {
 		return
 	}
 
-	// Извлекаем ссылку из сообщения пользователя
+	// Извлекаем ссылку из сообщения
 	const link = ctx.message.text.replace('/qr', '').trim()
 
 	try {
 		// Генерируем QR-код из ссылки
 		const qrDataURL = await qrcode.toDataURL(link)
 
-		// Создаем изображение QR-кода на холсте
+		// Создаем изображение QR-кода
 		const canvas = createCanvas(200, 200)
 		const ctx2d = canvas.getContext('2d')
 
-		const img = await loadImage(qrDataURL) // Загружаем изображение QR-кода
+		const img = await loadImage(qrDataURL) // Загружаем изображение
 
 		ctx2d.drawImage(img, 0, 0)
 
-		// Отправляем изображение QR-кода пользователю
+		// Отправляем изображение
 ctx.replyWithPhoto({ source: canvas.toBuffer() });
 	} catch (error) {
 		console.error('Ошибка при создании QR-кода:', error)
@@ -63,6 +73,39 @@ ctx.replyWithPhoto({ source: canvas.toBuffer() });
 	}
 }) 
 
+bot.command('webscr', async ctx => {
+	// Получаем веб-адрес из сообщения пользователя
+	const url = ctx.message.text.split(' ')[1]
+
+	// Проверяем наличие веб-адреса
+	if (!url) {
+		ctx.reply('Пожалуйста, укажите веб-адрес')
+		return
+	}
+
+	// Запускаем браузер
+	const browser = await puppeteer.launch()
+
+	// Открываем новую страницу
+	const page = await browser.newPage()
+
+	try {
+		// Переходим по указанному веб-адресу
+		await page.goto(url)
+
+		// Создаем скриншот страницы
+		const screenshot = await page.screenshot()
+
+		// Отправляем скриншот пользователю
+		await ctx.replyPhoto({ source: screenshot })
+	} catch (error) {
+		console.error(error)
+		ctx.reply('Произошла ошибка при обработке вашего запроса')
+	} finally {
+		// Закрываем браузер после завершения операции
+		await browser.close()
+	}
+})
 
 bot.command('help', async ctx => {
 	await ctx.reply(
