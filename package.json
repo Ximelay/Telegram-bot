@@ -13,9 +13,11 @@
 		"canvas": "^2.11.2",
 		"dotenv": "^16.4.5",
 		"grammy": "^1.21.2",
+		"mysql2": "^3.9.6",
 		"node-telegram-bot-api": "^0.65.1",
 		"nodemon": "^3.1.0",
 		"puppeteer": "^22.6.3",
-		"qrcode": "^1.5.3"
+		"qrcode": "^1.5.3",
+		"set-interval-async": "^3.0.3"
 	}
 }

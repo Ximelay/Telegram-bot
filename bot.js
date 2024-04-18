@@ -5,11 +5,15 @@ const { Bot, GrammyError, HttpError } = require('grammy')
 const qrcode = require('qrcode')
 const { createCanvas, loadImage } = require('canvas')
 
+const mysql = require('mysql2/promise')
+const setIntervalAsync = require('set-interval-async/dynamic')
+
 const puppeteer = require('puppeteer');
 
 const bot = new Bot(process.env.BOT_API_KEY) //подключаем API бота
 
 // !очень важен порядок обработчиков
+
 
 bot.api.setMyCommands([
 	{
@@ -35,6 +39,10 @@ bot.api.setMyCommands([
 	{
 		command: 'webscr',
 		description: 'Отправляет в чат скриншот указанного сайта',
+	},
+	{
+		command: 'name',
+		description: 'Отправляет в чат ваше имя',
 	},
 ])
 
@@ -109,7 +117,7 @@ bot.command('webscr', async ctx => {
 
 bot.command('help', async ctx => {
 	await ctx.reply(
-		'/start - Старт бота\n/site - Отправляет в чат ссылку на сайт октагона\n/creator - отправляет в чат ФИО'
+		'/start - Старт бота\n/site - Отправляет в чат ссылку на сайт октагона\n/creator - отправляет в чат ФИО\n/qr - Отправляет QR-код на указанную ссылку\n/webscr - Отправляет в чат скриншот указанного сайта'
 	)
 })
 
@@ -118,25 +126,98 @@ bot.command('creator', async ctx => {
 		'Зачем тебе свое ФИО? Ладно, держи:\nЛазуткин Илья Константинович'
 	)
 })
+// todoКоманда проверка, не обращайте внимание
+// bot.command('name', async ctx => {
+// 	if (ctx.from.id === 1196691577)
+// 	{
+// 		await ctx.reply('Привет, Руслан)')
+// 	}
+// })
 
 bot.command('site', async (ctx) => {
 	await ctx.reply('Ссылка на сайт Octagon: https://students.forus.ru/business')
 })
 
+async function main() {
+	// Подключение к базе данных
+	const connection = await mysql.createConnection({
+		host: 'localhost',
+		user: 'root',
+		password: 'qwerty',
+		database: 'Users',
+		waitForConnections: true,
+		connectionLimit: 10,
+		queueLimit: 0,
+		charset: 'utf8mb4',
+	})
 
-// TODO проверка на различные ошибки
-bot.catch(err => {
-	const ctx = err.ctx
-	console.log(`Ошибка при обработке обновления ${ctx.update.update_id}:`)
-	const e = err.error
-
-	if (e instanceof GrammyError) {
-		console.error('Ошибка в запросе:', e.description)
-	} else if (e instanceof HttpError) {
-		console.error('Не удалось связаться с Telegram:', e)
-	} else {
-		console.error('Неизвестная ошибка', e)
+	// Функция для обновления записи в таблице Users при получении сообщения от пользователя
+	async function updateUserLastMessage(userID) {
+		try {
+			const [rows] = await connection.execute(
+				'INSERT INTO Users (ID, lastMessage) VALUES (?, NOW()) ON DUPLICATE KEY UPDATE lastMessage = NOW()',
+				[userID]
+			)
+			console.log(`Запись пользователя ${userID} обновлена успешно.`)
+		} catch (error) {
+			console.error('Ошибка при обновлении записи пользователя:', error)
+		}
 	}
-})
 
-bot.start() //старт бота
+	// Обработчик для события "message" с вызовом updateUserLastMessage
+	bot.on('message', async ctx => {
+		const userID = ctx.message.from.id
+		await updateUserLastMessage(userID)
+	})
+
+	// Функция для проверки даты последнего сообщения пользователей и отправки "randomItem"
+	async function checkLastMessages() {
+		try {
+			const [rows] = await connection.execute(
+				'SELECT ID, lastMessage FROM Users'
+			)
+
+			const currentDate = new Date()
+
+			for (const row of rows) {
+				const userID = row.ID
+				const lastMessageDate = new Date(row.lastMessage)
+
+				// Разница во времени между текущей датой и датой последнего сообщения пользователя
+				const timeDiff = currentDate.getTime() - lastMessageDate.getTime()
+
+				if (timeDiff > 2 * 24 * 60 * 60 * 1000) {
+					await bot.api.sendMessage(userID, 'Вы тут?')
+					console.log(`Отправлено сообщение "Вы тут?" пользователю ${userID}`)
+				}
+			}
+		} catch (error) {
+			console.error(
+				'Ошибка при проверке последних сообщений пользователей:',
+				error
+			)
+		}
+	}
+	// Создание таймера для checkLastMessages
+	setInterval(checkLastMessages, 24 * 60 * 60 * 1000)
+
+	// TODO проверка на различные ошибки
+	bot.catch(err => {
+		const ctx = err.ctx
+		console.log(`Ошибка при обработке обновления ${ctx.update.update_id}:`)
+		const e = err.error
+
+		if (e instanceof GrammyError) {
+			console.error('Ошибка в запросе:', e.description)
+		} else if (e instanceof HttpError) {
+			console.error('Не удалось связаться с Telegram:', e)
+		} else {
+			console.error('Неизвестная ошибка', e)
+		}
+	})
+
+	bot.start() //старт бота
+}
+// Вызываем функцию main()
+main().catch(console.error);
+
