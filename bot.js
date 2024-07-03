@@ -58,6 +58,16 @@ bot.command('qr', async ctx => {
 		return
 	}
 
+	bot.hears('creator_ximelay', async ctx => {
+		if (ctx.from.id === tgId) {
+			await ctx.reply(
+				'Привет, Ximelay. Скоро этот раздел будет исключительно для тебя'
+			)
+		} else {
+			await ctx.reply('Эта команда исключительно для админа(')
+		}
+	})
+
 	// Извлекаем ссылку из сообщения
 	const link = ctx.message.text.replace('/qr', '').trim()
 
@@ -74,7 +84,7 @@ bot.command('qr', async ctx => {
 		ctx2d.drawImage(img, 0, 0)
 
 		// Отправляем изображение
-ctx.replyWithPhoto({ source: canvas.toBuffer() });
+		ctx.replyWithPhoto({ source: canvas.toBuffer() })
 	} catch (error) {
 		console.error('Ошибка при создании QR-кода:', error)
 		ctx.reply('Произошла ошибка при создании QR-кода.')
@@ -126,7 +136,7 @@ bot.command('creator', async ctx => {
 		'Зачем тебе свое ФИО? Ладно, держи:\nЛазуткин Илья Константинович'
 	)
 })
-// todoКоманда проверка, не обращайте внимание
+// TODO Команда проверка, не обращайте внимание
 // bot.command('name', async ctx => {
 // 	if (ctx.from.id === 1196691577)
 // 	{
